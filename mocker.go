@@ -87,7 +87,11 @@ func (m *Mock) Return(rets ...interface{}) *Mock {
 	}
 
 	returnValues := make([]reflect.Value, len(rets))
+	fnType := m.originalFunc.Type()
 	for ii, val := range rets {
+		if val == nil {
+			val = reflect.Zero(fnType.Out(ii)).Interface()
+		}
 		returnValues[ii] = reflect.ValueOf(val)
 	}
 
