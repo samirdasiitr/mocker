@@ -1,7 +1,6 @@
 package mocker
 
 import (
-	"fmt"
 	"reflect"
 )
 
@@ -90,9 +89,10 @@ func (m *Mock) Return(rets ...interface{}) *Mock {
 	fnType := m.originalFunc.Type()
 	for ii, val := range rets {
 		if val == nil {
-			val = reflect.Zero(fnType.Out(ii)).Interface()
+			returnValues[ii] = reflect.Zero(fnType.Out(ii))
+		} else {
+			returnValues[ii] = reflect.ValueOf(val)
 		}
-		returnValues[ii] = reflect.ValueOf(val)
 	}
 
 	m.returnValues[len(m.returnValues)-1].returnValues = returnValues
@@ -111,7 +111,25 @@ func (m *Mock) Unpatch() {
 	Unpatch(m.originalFunc.Interface())
 }
 
-func (m *Mock) ExpectCall(args []reflect.Value) {
-	// Implement your logic to record the expected call
-	fmt.Println("Expected call with args:", args)
+type MockStruct struct {
+	mocks map[string]*Mock
+}
+
+func NewMockStruct(target interface{}) *MockStruct {
+	ms := MockStruct{
+		mocks: make(map[string]*Mock),
+	}
+
+	structType := reflect.TypeOf(target)
+	for i := 0; i < structType.NumMethod(); i++ {
+		method := structType.Method(i)
+		mock := NewMock()
+		ms.mocks[method.Name] = mock.PatchInstance(target, method.Name)
+	}
+
+	return &ms
+}
+
+func (ms *MockStruct) Patch(methodName string) *Mock {
+	return ms.mocks[methodName]
 }
