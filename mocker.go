@@ -64,6 +64,9 @@ func (m *Mock) PatchInstance(target interface{}, methodName string) *Mock {
 }
 
 func (m *Mock) AnyTimes() *Mock {
+	if m.returnValues == nil {
+		m.returnValues = make([]Return, 1)
+	}
 	m.anyTimes = true
 	return m
 }
