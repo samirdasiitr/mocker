@@ -1,6 +1,7 @@
 package mocker
 
 import (
+	"log"
 	"reflect"
 )
 
@@ -16,15 +17,27 @@ type Mock struct {
 	patchedFunc  reflect.Value
 	anyTimes     bool
 	returnValues []Return
+	isRecording  bool
+	recordedArgs [][]interface{}
 }
 
 func NewMock() *Mock {
-	return &Mock{}
+	return &Mock{
+		recordedArgs: make([][]interface{}, 0),
+	}
 }
 
 func (m *Mock) generateReplacement(target reflect.Value) reflect.Value {
 	m.originalFunc = target
 	replacementFunc := reflect.MakeFunc(m.originalFunc.Type(), func(args []reflect.Value) []reflect.Value {
+		if m.isRecording {
+			log.Printf("Recording incoming values")
+			rArgs := make([]interface{}, len(args))
+			for ii, arg := range args {
+				rArgs[ii] = arg.Interface()
+			}
+			m.recordedArgs = append(m.recordedArgs, rArgs)
+		}
 		if m.anyTimes {
 			if reflect.ValueOf(m.returnValues[0].returnFn).IsZero() {
 				return m.returnValues[0].returnValues
@@ -102,11 +115,20 @@ func (m *Mock) Return(rets ...interface{}) *Mock {
 	return m
 }
 
+func (m *Mock) GetRecordedArgs() [][]interface{} {
+	return m.recordedArgs
+}
+
 func (m *Mock) DoAndReturn(retFn interface{}) *Mock {
 	if m.returnValues == nil {
 		panic("please set times or anytimes")
 	}
 	m.returnValues[len(m.returnValues)-1].returnFn = reflect.ValueOf(retFn)
+	return m
+}
+
+func (m *Mock) Record() *Mock {
+	m.isRecording = true
 	return m
 }
 
