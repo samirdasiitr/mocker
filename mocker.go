@@ -76,6 +76,12 @@ func (m *Mock) PatchInstance(target interface{}, methodName string) *Mock {
 	return m
 }
 
+func (m *Mock) PatchInstanceEx(fn reflect.Value, target interface{}, methodName string) *Mock {
+	m.patchedFunc = m.generateReplacement(fn)
+	PatchInstanceMethodEx(target, methodName, m.patchedFunc.Interface())
+	return m
+}
+
 func (m *Mock) AnyTimes() *Mock {
 	if m.returnValues == nil {
 		m.returnValues = make([]Return, 1)

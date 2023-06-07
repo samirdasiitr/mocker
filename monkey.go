@@ -2,6 +2,7 @@ package mocker // import "bou.ke/monkey"
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"sync"
 	"unsafe"
@@ -17,7 +18,8 @@ type patch struct {
 var (
 	lock = sync.Mutex{}
 
-	patches = make(map[uintptr]patch)
+	patches                = make(map[uintptr]patch)
+	unexportedFuncsPatches = make(map[uintptr]patch)
 )
 
 type value struct {
@@ -31,6 +33,11 @@ func getPtr(v reflect.Value) unsafe.Pointer {
 
 type PatchGuard struct {
 	target      reflect.Value
+	replacement reflect.Value
+}
+
+type PatchGuardForUnexported struct {
+	target      uintptr
 	replacement reflect.Value
 }
 
@@ -64,21 +71,36 @@ func PatchInstanceMethod(target reflect.Type, methodName string, replacement int
 	return &PatchGuard{m.Func, r}
 }
 
-func patchValue(target, replacement reflect.Value) {
+// PatchInstanceMethod replaces an instance method methodName for the type target with replacement
+// Replacement should expect the receiver (of type target) as the first argument
+func PatchInstanceMethodEx(target interface{}, methodName string,
+	replacement interface{}) *PatchGuardForUnexported {
+
+	targetName := fmt.Sprintf("(*%s).%s",
+		reflect.TypeOf(target).Elem().Name(), methodName)
+
+	fn, err := FindFuncWithName(targetName)
+	if err != nil {
+		log.Fatalf("Unable to find function %s, err: %v", targetName, err.Error())
+	}
+
+	r := reflect.ValueOf(replacement)
 	lock.Lock()
 	defer lock.Unlock()
 
-	// if target.Kind() != reflect.Func {
-	// 	panic("target has to be a Func")
-	// }
+	if patch, ok := unexportedFuncsPatches[fn.Entry()]; ok {
+		unpatch(fn.Entry(), patch)
+	}
 
-	// if replacement.Kind() != reflect.Func {
-	// 	panic("replacement has to be a Func")
-	// }
+	bytes := replaceFunction(fn.Entry(), (uintptr)(getPtr(r)))
+	unexportedFuncsPatches[fn.Entry()] = patch{bytes, &r}
 
-	// if target.Type() != replacement.Type() {
-	// 	panic(fmt.Sprintf("target and replacement have to have the same type %s != %s", target.Type(), replacement.Type()))
-	// }
+	return &PatchGuardForUnexported{fn.Entry(), r}
+}
+
+func patchValue(target, replacement reflect.Value) {
+	lock.Lock()
+	defer lock.Unlock()
 
 	if patch, ok := patches[target.Pointer()]; ok {
 		unpatch(target.Pointer(), patch)
@@ -111,6 +133,10 @@ func UnpatchAll() {
 	for target, p := range patches {
 		unpatch(target, p)
 		delete(patches, target)
+	}
+	for target, p := range unexportedFuncsPatches {
+		unpatch(target, p)
+		delete(unexportedFuncsPatches, target)
 	}
 }
 
