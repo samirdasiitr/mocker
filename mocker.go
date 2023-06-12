@@ -1,8 +1,10 @@
 package mocker
 
 import (
+	"fmt"
 	"log"
 	"reflect"
+	"runtime"
 )
 
 type Return struct {
@@ -19,6 +21,7 @@ type Mock struct {
 	returnValues []Return
 	isRecording  bool
 	recordedArgs [][]interface{}
+	name         string
 }
 
 func NewMock() *Mock {
@@ -56,27 +59,32 @@ func (m *Mock) generateReplacement(target reflect.Value) reflect.Value {
 				return m.returnValues[0].returnFn.Call(args)
 			}
 		}
-		panic("unexpected")
+		panic("unexpected call to " + m.name)
 	}).Interface()
 
 	return reflect.ValueOf(replacementFunc)
 }
 
 func (m *Mock) Patch(target interface{}) *Mock {
-	m.patchedFunc = m.generateReplacement(reflect.ValueOf(target))
+	funcValue := reflect.ValueOf(target)
+	m.name = runtime.FuncForPC(funcValue.Pointer()).Name()
+	m.patchedFunc = m.generateReplacement(funcValue)
 	Patch(target, m.patchedFunc.Interface())
 	return m
 }
 
 func (m *Mock) PatchInstance(target interface{}, methodName string) *Mock {
 	tType := reflect.TypeOf(target)
+	m.name = fmt.Sprintf("%s.%s", tType.Name(), methodName)
 	tFunc, _ := tType.MethodByName(methodName)
 	m.patchedFunc = m.generateReplacement(tFunc.Func)
 	PatchInstanceMethod(tType, methodName, m.patchedFunc.Interface())
 	return m
 }
 
-func (m *Mock) PatchInstanceEx(fn reflect.Value, target interface{}, methodName string) *Mock {
+func (m *Mock) PatchInternalMethod(fn reflect.Value, target interface{}, methodName string) *Mock {
+	tType := reflect.TypeOf(target)
+	m.name = fmt.Sprintf("%s.%s", tType.Name(), methodName)
 	m.patchedFunc = m.generateReplacement(fn)
 	PatchInstanceMethodEx(target, methodName, m.patchedFunc.Interface())
 	return m
