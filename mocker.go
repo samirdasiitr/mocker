@@ -147,6 +147,12 @@ func (m *Mock) Record() *Mock {
 }
 
 func (m *Mock) Unpatch() {
+	for _, retValue := range m.returnValues {
+		if retValue.calledTimes != retValue.times {
+			log.Fatalf("Patch %q not called enough times (%d != %d)",
+				m.name, retValue.calledTimes, retValue.times)
+		}
+	}
 	Unpatch(m.originalFunc.Interface())
 }
 
