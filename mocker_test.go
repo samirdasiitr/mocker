@@ -1,7 +1,6 @@
 package mocker
 
 import (
-	"log"
 	"reflect"
 	"testing"
 	_ "unsafe"
@@ -36,22 +35,24 @@ func TestMocker(tt *testing.T) {
 	mock := NewMock().Patch(add)
 	mock.Times(2).Return(int64(0))
 	mock.Times(1).Return(int64(1))
-	// mock.Times(1).Return(int64(19))
-	log.Printf("%v", sum(1, 2))
-	log.Printf("%v", sum(1, 2))
-	log.Printf("%v", sum(1, 2))
-	mock.Unpatch()
+
+	require.Equal(tt, int64(0), sum(1, 2))
+	require.Equal(tt, int64(0), sum(1, 2))
+	require.Equal(tt, int64(1), sum(1, 4))
+
+	UnpatchAll()
 }
 
 func TestMockerInstance(tt *testing.T) {
 	t := &Test{}
-	mock := NewMock().PatchInternalMethod(reflect.ValueOf(t.unique), t, "unique")
+	mock := NewMock().PatchInstance(t, "Add")
 	mock.Times(2).Return(int64(0))
 	mock.Times(1).Return(int64(1))
-	require.Equal(tt, int64(0), sumInstance(1, 2))
-	require.Equal(tt, int64(0), sumInstance(1, 2))
-	require.Equal(tt, int64(1), sumInstance(1, 2))
-	mock.Unpatch()
+
+	require.Equal(tt, int64(0), t.Add(1, 2))
+	require.Equal(tt, int64(0), t.Add(1, 2))
+	require.Equal(tt, int64(1), t.Add(1, 2))
+	UnpatchAll()
 }
 
 //go:linkname patchedUnique Test.unique
@@ -65,6 +66,9 @@ func TestMockerInstanceDoAndReturn(tt *testing.T) {
 	mock.Times(2).DoAndReturn(func(_ *Test, a, b int64) int64 {
 		return (a + b) * 100
 	})
-	require.Equal(tt, int64(300), sumInstance(1, 2))
-	mock.Unpatch()
+
+	for ii := 0; ii < 2; ii++ {
+		require.Equal(tt, int64(300), sumInstance(1, 2))
+	}
+	UnpatchAll()
 }
