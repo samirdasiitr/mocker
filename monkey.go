@@ -127,7 +127,7 @@ func UnpatchInstanceMethod(target reflect.Type, methodName string) bool {
 }
 
 // UnpatchAll removes all applied monkeypatches
-func UnpatchAll() {
+func unpatchAll() {
 	lock.Lock()
 	defer lock.Unlock()
 	for target, p := range patches {
